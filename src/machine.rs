@@ -111,18 +111,11 @@ impl Chip8 {
                 let v_y = v_y as usize;
 
                 match mode {
-                    SetRegMode::Copy => {
-                        self.regs[v_x] = self.regs[v_y];
-                    },
-                    SetRegMode::Or => {
-                        self.regs[v_x] |= self.regs[v_y];
-                    },
-                    SetRegMode::And => {
-                        self.regs[v_x] &= self.regs[v_y];
-                    },
-                    SetRegMode::Xor => {
-                        self.regs[v_x] ^= self.regs[v_y];
-                    },
+                    SetRegMode::Copy => self.regs[v_x] = self.regs[v_y],
+                    
+                    SetRegMode::Or => self.regs[v_x] |= self.regs[v_y],
+                    SetRegMode::And => self.regs[v_x] &= self.regs[v_y],
+                    SetRegMode::Xor => self.regs[v_x] ^= self.regs[v_y],
 
                     SetRegMode::Add => {
                         let reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
@@ -147,15 +140,15 @@ impl Chip8 {
 
                         self.regs[v_x] = reg_value as u8;
                     },
-                    SetRegMode::InverseSubtract => {
 
-                    },
-
+                    // v_y is ignored for the shift opcodes, not sure why
                     SetRegMode::ShiftLeft => {
-
+                        self.regs[0xF] = self.regs[v_x] & 0xF0 >> 8;
+                        self.regs[v_x] <<= 1; 
                     },
                     SetRegMode::ShiftRight => {
-
+                        self.regs[0xF] = self.regs[v_x] & 0x0F;
+                        self.regs[v_x] >>= 1; 
                     }
                 }
             },
@@ -176,4 +169,8 @@ impl Chip8 {
     }
 }
 
-impl fmt::
+impl fmt::Debug for Chip8 {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        write!(fmt, "Register Contents: {:?}", self.regs);
+    }
+}
