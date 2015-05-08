@@ -67,7 +67,6 @@ impl Chip8 {
             Err(err) => return Err(OpcodeErr(err)),
         };
 
-        println!("{:?}", opcode);
         try!(self.execute_opcode(opcode));
 
         Ok(())
