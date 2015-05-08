@@ -98,20 +98,21 @@ pub enum Opcode {
     },
 
     SetRegToDelayTimer(u8), // FX07
-    PutKeyInReg(u8), // FX0A
+    WaitForKeyInReg(u8), // FX0A
 
     SetDelayTimerToReg(u8), // FX15
     SetSoundTimerToReg(u8), // FX18
 
     AddRegToAddressReg(u8), // FX1E
+    SetAddressRegToCharInReg(u8), // FX29, sets the address pointer to point to the text character specified in X
     RegToBCD(u8), // FX33, see http://en.wikipedia.org/wiki/Binary-coded_decimal
     
     DumpRegsToAddr(u8), // FX55
-    RestoreRegsFromAddr(u8), // FX65
+    LoadRegsFromAddr(u8), // FX65
 }
 
 impl Opcode {
-    pub fn from_u16(bytes: u16) -> OpcodeResult {
+    pub fn from_u16(bytes: u16) -> OpcodeResult 
         use self::Opcode::*;
         use self::OpcodeError::*;
 
@@ -144,17 +145,15 @@ impl Opcode {
                     value: (bytes & 0x00FF) as u8,
                 })
             },
-            0x5000 | 0x9000 => {
-                match bytes & 0x000F {
-                    0x0 => {
-                        Ok(SkipIfRegsEqual {
-                            not_equal: msb == 0x9000,
-                            regs: (((bytes & 0x0F00) >> 8) as u8,
-                                   ((bytes & 0x00F0) >> 4) as u8),
-                        })
-                    },
-                    _ => Err(UnrecognizedOpcode(bytes)),
-                }
+            0x5000 | 0x9000 => match bytes & 0x000F {
+                0x0 => {
+                    Ok(SkipIfRegsEqual {
+                        not_equal: msb == 0x9000,
+                        regs: (((bytes & 0x0F00) >> 8) as u8,
+                               ((bytes & 0x00F0) >> 4) as u8),
+                    })
+                },
+                _ => Err(UnrecognizedOpcode(bytes)),
             },
             0x6000 | 0x7000 => {
                 Ok(SetRegToConst {
@@ -185,7 +184,36 @@ impl Opcode {
                 })
             },
             0xD000 => {
-                
+                Ok(DrawSprite {
+                    regs: (((bytes & 0x0F00) >> 8) as u8,
+                           ((bytes & 0x00F0) >> 4) as u8),
+                    bytes: (bytes & 0x000F) as u8,
+                })
+            },
+            0xE000 => match bytes & 0x00FF {
+                0x9E | 0xA1 => {
+                    Ok(SkipIfKeyInRegPressed {
+                        not_pressed: (bytes & 0x00FF) == 0xA1,
+                        reg: ((bytes & 0x0F00) >> 8) as u8,
+                    })
+                },
+                _ => Err(UnrecognizedOpcode(bytes)),
+            },
+            0xF000 => {
+                let reg = ((bytes & 0x0F00) >> 8) as u8;
+
+                match bytes & 0x00FF {
+                    0x07 => Ok(SetRegToDelayTimer(reg)),
+                    0x0A => Ok(WaitForKeyInReg(reg)),
+                    0x15 => Ok(SetDelayTimerToReg(reg)),
+                    0x18 => Ok(SetSoundTimerToReg(reg)),
+                    0x1E => Ok(AddRegToAddressReg(reg)),
+                    0x29 => Ok(SetAddressRegToCharInReg(reg)),
+                    0x33 => Ok(RegToBCD(reg)),
+                    0x55 => Ok(DumpRegsToAddr(reg)),
+                    0x65 => Ok(LoadRegsFromAddr(reg)),
+                    _ => Err(UnrecognizedOpcode(bytes)),
+                }
             },
             _ => Err(UnrecognizedOpcode(bytes)),
         }
