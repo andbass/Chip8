@@ -7,7 +7,7 @@ pub enum OpcodeError {
     InvalidModeForSetRegToReg(u8),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SetRegMode {
     Copy = 0x0, // VX = VY
 
@@ -112,7 +112,7 @@ pub enum Opcode {
 }
 
 impl Opcode {
-    pub fn from_u16(bytes: u16) -> OpcodeResult 
+    pub fn from_u16(bytes: u16) -> OpcodeResult {
         use self::Opcode::*;
         use self::OpcodeError::*;
 

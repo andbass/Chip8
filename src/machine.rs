@@ -1,4 +1,7 @@
 
+use rand::thread_rng;
+
+use std::io;
 use std::fmt;
 
 use opcode::{Opcode, OpcodeError, SetRegMode};
@@ -21,7 +24,8 @@ pub struct Chip8 {
     addressReg: u16, // register I
 
     pc: u16,
-    // Stores the program counters of sub routine calls, used to return after a sub routine ends
+    // Stores thebbkbb vbfcvgbhnjm,k,mjnhbgvfbgnm,.
+    // program counters of sub routine calls, used to return after a sub routine ends
     stack: Vec<u16>,
 
     screen: [[bool; 64]; 32],
@@ -41,9 +45,19 @@ impl Chip8 {
         }
     }
 
+    pub fn load_program<R: io::Read>(&mut self, mut program: R) -> io::Result<()> {
+        let mut bytes = Vec::new();
+        try!(program.read_to_end(&mut bytes));
+        
+        for (offset, byte) in bytes.iter().enumerate() {
+            self.memory[offset + PROGRAM_START as usize] = *byte;
+        }
+
+        Ok(())
+    }
+
     pub fn cycle(&mut self) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
-        use opcode::Opcode::*;
 
         let pc_index = self.pc as usize;
         let opcode_bytes = (self.memory[pc_index] as u16) << 8 | (self.memory[pc_index + 1] as u16);
@@ -52,6 +66,32 @@ impl Chip8 {
             Ok(opcode) => opcode,
             Err(err) => return Err(OpcodeErr(err)),
         };
+
+        println!("{:?}", opcode);
+        try!(self.execute_opcode(opcode));
+
+        Ok(())
+    }
+
+    pub fn clear_screen(&mut self) {
+        for row in self.screen.iter_mut() {
+            for col in row.iter_mut() {
+                *col = false;
+            }
+        }
+    }
+
+    // Wrapping is performed in this function, no need to perform it outside
+    pub fn toggle_pixel(x: usize, y: usize) {
+        let x = x % 64;
+        let y = y % 32;
+    
+        
+    }
+
+    pub fn execute_opcode(&mut self, opcode: Opcode) -> Result<(), RuntimeError> {
+        use self::RuntimeError::*;
+        use opcode::Opcode::*;
 
         match opcode { 
             ClearScreen => self.clear_screen(),
@@ -118,7 +158,7 @@ impl Chip8 {
                     SetRegMode::Xor => self.regs[v_x] ^= self.regs[v_y],
 
                     SetRegMode::Add => {
-                        let reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
+                        let mut reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
                         if reg_value > 255 {
                             reg_value -= 255;
                             self.regs[0xF] = 1;
@@ -127,10 +167,10 @@ impl Chip8 {
                         self.regs[v_x] = reg_value as u8;
                     },
                     SetRegMode::Subtract | SetRegMode::InverseSubtract => {
-                        let reg_value = if let SetRegMode::Subtract = mode {
-                            self.regs[v_x] as isize - self.regs[v_y] as isize;
-                        else { // Must be InverseSubtract
-                            self.regs[v_y] as isize - self.regs[v_x] as isize;
+                        let mut reg_value = if mode == SetRegMode::Subtract {
+                            self.regs[v_x] as isize - self.regs[v_y] as isize
+                        } else { // Must be InverseSubtract
+                            self.regs[v_y] as isize - self.regs[v_x] as isize
                         };
 
                         if reg_value < 0 {
@@ -140,15 +180,15 @@ impl Chip8 {
 
                         self.regs[v_x] = reg_value as u8;
                     },
-
+                        
                     // v_y is ignored for the shift opcodes, not sure why
                     SetRegMode::ShiftLeft => {
-                        self.regs[0xF] = self.regs[v_x] & 0xF0 >> 8;
+                        self.regs[0xF] = self.regs[v_x] & 0xF0 >> 4;
                         self.regs[v_x] <<= 1; 
                     },
                     SetRegMode::ShiftRight => {
                         self.regs[0xF] = self.regs[v_x] & 0x0F;
-                        self.regs[v_x] >>= 1; 
+                        self.regs[v_x] >>= 1;
                     }
                 }
             },
@@ -156,21 +196,16 @@ impl Chip8 {
         }
 
         self.pc += 2;
-
         Ok(())
-    }
-
-    pub fn clear_screen(&mut self) {
-        for row in self.screen.iter_mut() {
-            for col in row.iter_mut() {
-                *col = false;
-            }
-        }
     }
 }
 
 impl fmt::Debug for Chip8 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "Register Contents: {:?}", self.regs);
+        try!(writeln!(fmt, "Program Counter: 0x{:X}", self.pc));
+        try!(writeln!(fmt, "Address Register: 0x{:X}", self.addressReg));
+        try!(writeln!(fmt, "Stack: {:?}", self.stack));
+
+        write!(fmt, "Register Contents: {:?}", self.regs)
     }
 }
