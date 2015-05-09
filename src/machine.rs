@@ -1,5 +1,5 @@
 
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 
 use std::io;
 use std::fmt;
@@ -24,9 +24,10 @@ pub struct Chip8 {
     addressReg: u16, // register I
 
     pc: u16,
-    // Stores thebbkbb vbfcvgbhnjm,k,mjnhbgvfbgnm,.
-    // program counters of sub routine calls, used to return after a sub routine ends
     stack: Vec<u16>,
+
+    delay_timer: u16,
+    sound_timer: u16,
 
     screen: [[bool; 64]; 32],
 }
@@ -40,6 +41,9 @@ impl Chip8 {
             
             pc: PROGRAM_START,
             stack: Vec::new(),
+
+            delay_timer: 0,
+            sound_timer: 0,
 
             screen: [[false; 64]; 32],
         }
@@ -69,6 +73,9 @@ impl Chip8 {
 
         try!(self.execute_opcode(opcode));
 
+        Chip8::decrement_timer(&mut self.delay_timer);
+        Chip8::decrement_timer(&mut self.sound_timer);
+
         Ok(())
     }
 
@@ -81,11 +88,21 @@ impl Chip8 {
     }
 
     // Wrapping is performed in this function, no need to perform it outside
-    pub fn toggle_pixel(x: usize, y: usize) {
-        let x = x % 64;
-        let y = y % 32;
+    pub fn set_pixel(&mut self, x: usize, y: usize, state: bool) {
+        // Equivalent to using the mod operator, but faster
+        let x = x & 64;
+        let y = y & 32;
     
+        let previous_state = self.screen[y][x];
+        self.screen[y][x] ^= state;
         
+        // If a pixel was previously set and then now unset, set VF
+        if previous_state && !self.screen[y][x] {
+            self.regs[0xF] = 1; 
+            return;
+        }
+
+        self.regs[0xF] = 0;
     }
 
     pub fn execute_opcode(&mut self, opcode: Opcode) -> Result<(), RuntimeError> {
@@ -191,11 +208,68 @@ impl Chip8 {
                     }
                 }
             },
+
+            SetAddressReg(addr) => self.addressReg = addr,
+            SetRegToRandom { reg, mask } => {
+                let rand: u8 = thread_rng().gen();
+                self.regs[reg as usize] = rand & mask;
+            },
+
+            DrawSprite { regs: (v_x, v_y), rows } => {
+                let x = self.regs[v_x as usize] as usize;
+                let y = self.regs[v_y as usize] as usize;
+
+                for row in 0..rows {
+                    let sprite_slice = self.memory[self.addressReg + row];
+                    
+                    for col in 0..8 {
+                        let bit = (sprite_slice & (1 << col)) > 0;
+                        self.set_pixel(x + col, y + row, bit);        
+                    }
+                }
+            },
+
+            SetRegToDelayTimer(reg) => self.regs[reg] = self.delay_timer,
+            SetSoundTimerToReg(reg) => self.regs[reg] = self.sound_timer,
+
+            AddRegToAddressReg(reg) => self.addressReg += self.regs[reg],
+            SetAddressRegToCharInReg(reg) => (), // TODO
+
+            // See http://en.wikipedia.org/wiki/Binary-coded_decimal
+            // n mod 10 => Gets the ones digit out of a number
+            RegToBCD(reg) => {
+                let number = self.regs[reg];
+
+                let hundreds_digit = number / 100;
+                let tens_digit = (number / 10) % 10; // Dividing by ten slides the tens digit into the ones digit
+                let ones_digit = numbers % 10;
+
+                self.memory[self.addressReg] = hundreds_digit;
+                self.memory[self.addressReg + 1] = tens_digit;
+                self.memory[self.addressReg + 2] = ones_digit;
+            },
+
+            DumpRegsToAddr(reg) => {
+                for cur_reg in 0..(reg + 1) {
+                    self.memory[self.addressReg + cur_reg] = self.regs[cur_reg];  
+                }
+            },
+            LoadRegsFromAddr(reg) => {
+                for cur_reg in 0..(reg + 1) {
+                    self.regs[cur_reg] = self.memory[self.addressReg + cur_reg];
+                }
+            }
             _ => unreachable!(),
         }
 
         self.pc += 2;
         Ok(())
+    }
+
+    fn decrement_timer(timer: &mut u16) {
+        if *timer != 0 {
+            *timer -= 1;
+        }
     }
 }
 
