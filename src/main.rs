@@ -1,31 +1,28 @@
 
 extern crate rand;
+extern crate ncurses;
 
-use std::io::Cursor;
+use std::env;
+use std::fs;
 
 mod machine;
 mod opcode;
+mod frontend;
 
-use opcode::Opcode;
 use machine::Chip8;
+use frontend::Terminal;
 
 fn main() {
-    let program = vec![
-        // Set reg0 and reg1 to 5
-        0x60, 0x05,
-        0x61, 0x05,
-       
-        // Add them
-        0x80, 0x14,
-    ];
+    let path = match env::args.nth(1).unwrap();
+
+    let file = fs::File::open(path).unwrap();
 
     let mut chip8 = Chip8::new();
-    chip8.load_program(Cursor::new(program));
-    println!("{:?}\n", chip8);
+    let mut term = Terminal::new();
 
-    // we have three instructions total
-    for _ in 0..3 {
-        chip8.cycle(); 
-        println!("{:?}\n", chip8);
+    chip8.load_program(file);
+
+    loop {
+        chip8.cycle(&mut term);
     }
 }

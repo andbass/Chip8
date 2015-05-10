@@ -5,11 +5,33 @@ use std::io;
 use std::fmt;
 
 use opcode::{Opcode, OpcodeError, SetRegMode};
+use frontend::Frontend;
 
 const PROGRAM_START: u16 = 0x200;
+const FONT_START: u16 = 0x50;
 
 const MEMORY_SIZE: usize = 4096;
 const REGISTER_COUNT: usize = 16;
+
+// Thanks to: http://www.multigesture.net/articles/how-to-write-an-emulator-chip-8-interpreter/
+const FONTMAP: [u8; 80] = [
+  0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+  0x20, 0x60, 0x20, 0x20, 0x70, // 1
+  0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+  0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+  0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+  0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+  0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+  0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+  0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+  0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9
+  0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+  0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+  0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+  0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+  0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+  0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+];
 
 pub enum RuntimeError {
     EmptyCallStack,
@@ -19,22 +41,22 @@ pub enum RuntimeError {
 }
 
 pub struct Chip8 {
-    memory: [u8; MEMORY_SIZE],
-    regs: [u8; REGISTER_COUNT], // registers V0 - V15
-    addressReg: u16, // register I
+    pub memory: [u8; MEMORY_SIZE],
+    pub regs: [u8; REGISTER_COUNT], // registers V0 - V15
+    pub addressReg: u16, // register I
 
-    pc: u16,
-    stack: Vec<u16>,
+    pub pc: u16,
+    pub stack: Vec<u16>,
 
-    delay_timer: u16,
-    sound_timer: u16,
+    pub delay_timer: u16,
+    pub sound_timer: u16,
 
-    screen: [[bool; 64]; 32],
+    pub screen: [[bool; 64]; 32],
 }
 
 impl Chip8 {
     pub fn new() -> Chip8 {
-        Chip8 {
+        let mut chip8 = Chip8 {
             memory: [0; 4096],
             regs: [0; 16],
             addressReg: 0,
@@ -46,6 +68,15 @@ impl Chip8 {
             sound_timer: 0,
 
             screen: [[false; 64]; 32],
+        };
+
+        chip8.inject_fontmap();
+        chip8
+    }
+
+    pub fn inject_fontmap(&mut self) {
+        for (offset, byte) in FONTMAP.iter().enumerate() {
+            self.memory[FONT_START as usize + offset] = *byte;
         }
     }
 
@@ -60,7 +91,7 @@ impl Chip8 {
         Ok(())
     }
 
-    pub fn cycle(&mut self) -> Result<(), RuntimeError> {
+    pub fn cycle(&mut self, frontend: &mut Frontend) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
 
         let pc_index = self.pc as usize;
@@ -71,10 +102,12 @@ impl Chip8 {
             Err(err) => return Err(OpcodeErr(err)),
         };
 
-        try!(self.execute_opcode(opcode));
+        try!(self.execute_opcode(opcode, frontend.get_keys()));
 
         Chip8::decrement_timer(&mut self.delay_timer);
         Chip8::decrement_timer(&mut self.sound_timer);
+
+        frontend.draw(self.screen);
 
         Ok(())
     }
@@ -105,7 +138,7 @@ impl Chip8 {
         self.regs[0xF] = 0;
     }
 
-    pub fn execute_opcode(&mut self, opcode: Opcode) -> Result<(), RuntimeError> {
+    pub fn execute_opcode(&mut self, opcode: Opcode, keys: [bool; 16]) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
         use opcode::Opcode::*;
 
@@ -220,46 +253,66 @@ impl Chip8 {
                 let y = self.regs[v_y as usize] as usize;
 
                 for row in 0..rows {
-                    let sprite_slice = self.memory[self.addressReg + row];
+                    let sprite_slice = self.memory[(self.addressReg + row as u16) as usize];
                     
                     for col in 0..8 {
                         let bit = (sprite_slice & (1 << col)) > 0;
-                        self.set_pixel(x + col, y + row, bit);        
+                        self.set_pixel(x + col as usize, y + row as usize, bit);        
                     }
                 }
             },
 
-            SetRegToDelayTimer(reg) => self.regs[reg] = self.delay_timer,
-            SetSoundTimerToReg(reg) => self.regs[reg] = self.sound_timer,
+            SetRegToDelayTimer(reg) => self.regs[reg as usize] = self.delay_timer as u8,
 
-            AddRegToAddressReg(reg) => self.addressReg += self.regs[reg],
-            SetAddressRegToCharInReg(reg) => (), // TODO
+            SetDelayTimerToReg(reg) => self.delay_timer = self.regs[reg as usize] as u16,
+            SetSoundTimerToReg(reg) => self.sound_timer = self.regs[reg as usize] as u16,
+
+            AddRegToAddressReg(reg) => self.addressReg += self.regs[reg as usize] as u16,
+            SetAddressRegToCharInReg(reg) => {
+                let ch = self.regs[reg as usize];
+                self.addressReg = FONT_START + ch as u16 * 5;
+            },
+
+            WaitForKeyInReg(reg) => {
+                // TODO
+            },
+            SkipIfKeyInRegPressed { not_pressed, reg } => {
+                let should_jump = keys[self.regs[reg as usize] as usize];     
+
+                if not_pressed {
+                    should_jump = !should_jump;
+                }
+
+                if should_jump {
+                    self.pc += 4;
+                    return Ok(());
+                }
+            },
 
             // See http://en.wikipedia.org/wiki/Binary-coded_decimal
             // n mod 10 => Gets the ones digit out of a number
             RegToBCD(reg) => {
-                let number = self.regs[reg];
+                let number = self.regs[reg as usize];
 
                 let hundreds_digit = number / 100;
                 let tens_digit = (number / 10) % 10; // Dividing by ten slides the tens digit into the ones digit
-                let ones_digit = numbers % 10;
+                let ones_digit = number % 10;
 
-                self.memory[self.addressReg] = hundreds_digit;
-                self.memory[self.addressReg + 1] = tens_digit;
-                self.memory[self.addressReg + 2] = ones_digit;
+                self.memory[(self.addressReg) as usize] = hundreds_digit;
+                self.memory[(self.addressReg + 1) as usize] = tens_digit;
+                self.memory[(self.addressReg + 2) as usize] = ones_digit;
             },
 
             DumpRegsToAddr(reg) => {
                 for cur_reg in 0..(reg + 1) {
-                    self.memory[self.addressReg + cur_reg] = self.regs[cur_reg];  
+                    self.memory[(self.addressReg + cur_reg as u16)  as usize] = self.regs[cur_reg as usize];  
                 }
             },
             LoadRegsFromAddr(reg) => {
                 for cur_reg in 0..(reg + 1) {
-                    self.regs[cur_reg] = self.memory[self.addressReg + cur_reg];
+                    self.regs[cur_reg as usize] = self.memory[(self.addressReg + cur_reg as u16) as usize];
                 }
             }
-            _ => unreachable!(),
         }
 
         self.pc += 2;
@@ -278,6 +331,8 @@ impl fmt::Debug for Chip8 {
         try!(writeln!(fmt, "Program Counter: 0x{:X}", self.pc));
         try!(writeln!(fmt, "Address Register: 0x{:X}", self.addressReg));
         try!(writeln!(fmt, "Stack: {:?}", self.stack));
+        try!(writeln!(fmt, "Delay Timer: {}", self.delay_timer));
+        try!(writeln!(fmt, "Sound Timer: {}", self.sound_timer));
 
         write!(fmt, "Register Contents: {:?}", self.regs)
     }

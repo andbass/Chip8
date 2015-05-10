@@ -89,16 +89,16 @@ pub enum Opcode {
 
     DrawSprite { // DXYN, draws from sprite addr stored in I. Each sprite is 8 bits wide
         regs: (u8, u8),
-        bytes: u8,
+        rows: u8,
     },
 
     SkipIfKeyInRegPressed { // EX9E | EXA1 
         not_pressed: bool,
         reg: u8,
     },
+    WaitForKeyInReg(u8), // FX0A
 
     SetRegToDelayTimer(u8), // FX07
-    WaitForKeyInReg(u8), // FX0A
 
     SetDelayTimerToReg(u8), // FX15
     SetSoundTimerToReg(u8), // FX18
@@ -187,7 +187,7 @@ impl Opcode {
                 Ok(DrawSprite {
                     regs: (((bytes & 0x0F00) >> 8) as u8,
                            ((bytes & 0x00F0) >> 4) as u8),
-                    bytes: (bytes & 0x000F) as u8,
+                    rows: (bytes & 0x000F) as u8,
                 })
             },
             0xE000 => match bytes & 0x00FF {

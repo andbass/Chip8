@@ -2,6 +2,7 @@
 name = "chip8"
 version = "0.1.0"
 dependencies = [
+ "ncurses 5.73.0 (git+https://github.com/jeaye/ncurses-rs.git)",
  "rand 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -9,6 +10,14 @@ dependencies = [
 name = "libc"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "ncurses"
+version = "5.73.0"
+source = "git+https://github.com/jeaye/ncurses-rs.git#7451f8027d3d1691a8b5fccf204677a592041aa2"
+dependencies = [
+ "libc 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rand"
