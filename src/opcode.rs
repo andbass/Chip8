@@ -134,7 +134,8 @@ impl Opcode {
             0x1000 | 0xB000 => {
                 Ok(JumpTo { 
                     addr: bytes & 0x0FFF, 
-                    plus_v0: msb == 0xB000 })
+                    plus_v0: msb == 0xB000 
+                })
             },
             0x2000 => Ok(Call(bytes & 0x0FFF)),
             0x3000 | 0x4000 => {

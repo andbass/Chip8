@@ -3,6 +3,8 @@ use std::thread;
 
 use sdl2::{Sdl, SdlResult};
 use sdl2::rect::Rect;
+use sdl2::timer;
+use sdl2::scancode::ScanCode;
 use sdl2::video::{Window, WindowPos, OPENGL};
 use sdl2::render::{RenderDriverIndex, ACCELERATED, Renderer};
 use sdl2::keyboard;
@@ -57,12 +59,34 @@ impl<'a> Frontend for SdlFrontend<'a> {
 
     fn get_keys(&mut self) -> [bool; 16] {
         let keys = keyboard::get_keyboard_state(); 
+        let mut key_arr = [false; 16];
+        
+        key_arr[0x1] = keys[&ScanCode::Num1];
+        key_arr[0x2] = keys[&ScanCode::Num2];
+        key_arr[0x3] = keys[&ScanCode::Num3];
+        key_arr[0xC] = keys[&ScanCode::Num4];
 
+        key_arr[0x4] = keys[&ScanCode::Q];
+        key_arr[0x5] = keys[&ScanCode::W];
+        key_arr[0x6] = keys[&ScanCode::E];
+        key_arr[0xD] = keys[&ScanCode::R];
 
-        [false; 16]
+        key_arr[0x7] = keys[&ScanCode::A];
+        key_arr[0x8] = keys[&ScanCode::S];
+        key_arr[0x9] = keys[&ScanCode::D];
+        key_arr[0xE] = keys[&ScanCode::F];
+
+        key_arr[0xA] = keys[&ScanCode::Z];
+        key_arr[0x0] = keys[&ScanCode::X];
+        key_arr[0xB] = keys[&ScanCode::C];
+        key_arr[0xF] = keys[&ScanCode::V];
+
+        return key_arr;
     }
 
     fn emulate_loop(&mut self, mut chip8: Chip8) {
+        let mut start_time = timer::get_ticks();
+        
         'main: loop {
             for event in self.ctx.event_pump().poll_iter() {
                 use sdl2::event::Event;
@@ -72,15 +96,18 @@ impl<'a> Frontend for SdlFrontend<'a> {
                     _ => (),
                 }
             }
+            
+            if timer::get_ticks() - start_time > 5 {
+                match chip8.cycle(self.get_keys()) {
+                    Ok(_) => (),
+                    Err(err) => panic!("{:?}", err),
+                }
 
-            match chip8.cycle(self.get_keys()) {
-                Ok(_) => (),
-                Err(err) => panic!("{:?}", err),
+                println!("{:?}\n", chip8);
+                start_time = timer::get_ticks();
             }
 
             self.draw(&chip8.screen);
-
-            thread::sleep_ms(17);
         }
     }
 }

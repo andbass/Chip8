@@ -120,21 +120,17 @@ impl Chip8 {
     }
 
     // Wrapping is performed in this function, no need to perform it outside
-    pub fn set_pixel(&mut self, x: usize, y: usize, state: bool) {
+    // Returns if a pixel was unset
+    pub fn set_pixel(&mut self, x: usize, y: usize) -> bool {
         // Equivalent to using the mod operator, but faster
         let x = x & 63;
         let y = y & 31;
     
         let previous_state = self.screen[y][x];
-        self.screen[y][x] ^= state;
+        self.screen[y][x] = !self.screen[y][x];
         
-        // If a pixel was previously set and then now unset, set VF
-        if previous_state && !self.screen[y][x] {
-            self.regs[0xF] = 1; 
-            return;
-        }
-
-        self.regs[0xF] = 0;
+        // return whether a pixel was previously set and then now unset
+        previous_state
     }
 
     pub fn execute_opcode(&mut self, opcode: Opcode, keys: [bool; 16]) -> Result<(), RuntimeError> {
@@ -142,7 +138,6 @@ impl Chip8 {
         use opcode::Opcode::*;
 
         println!("{:?}", opcode);
-
         match opcode { 
             ClearScreen => self.clear_screen(),
             Return => {
@@ -158,14 +153,10 @@ impl Chip8 {
                 if plus_v0 { 
                     self.pc += self.regs[0] as u16; 
                 }
-
-                return Ok(());
             },
             Call(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
-
-                return Ok(());
             },
 
             SkipIfRegEqualConst { not_equal, reg, value } => {
@@ -188,17 +179,12 @@ impl Chip8 {
 
                 if should_jump {
                     self.pc += 2;
-                    return Ok(());
                 }
             },
 
             SetRegToConst { add, reg, value } => {
                 if add {
-                    let mut value = self.regs[reg as usize] as u32 + value as u32;
-                    if value > 255 {
-                        value -= 255;
-                    }
-
+                    let mut value = (self.regs[reg as usize] as u32 + value as u32) & 255;
                     self.regs[reg as usize] = value as u8;
                 } else {
                     self.regs[reg as usize] = value;
@@ -241,14 +227,9 @@ impl Chip8 {
                         
                     // v_y is ignored for the shift opcodes, not sure why
                     SetRegMode::ShiftLeft => {
-                        self.regs[0xF] = self.regs[v_x] & 0x1000000;
+                        self.regs[0xF] = self.regs[v_x] & 128;
 
-                        let mut value = (self.regs[v_x] as usize) << 1;
-                        if value > 255 {
-                            value -= 255;
-                        }
-
-                        self.regs[v_x] = value as u8;
+                        self.regs[v_x] <<= 1;
                     },
                     SetRegMode::ShiftRight => {
                         self.regs[0xF] = self.regs[v_x] & 0x1;
@@ -267,12 +248,17 @@ impl Chip8 {
                 let x = self.regs[v_x as usize] as usize;
                 let y = self.regs[v_y as usize] as usize;
 
+                self.regs[0xF] = 0;
+
                 for row in 0..rows {
                     let sprite_slice = self.memory[(self.addressReg + row as u16) as usize];
                     
                     for col in 0..8 {
-                        let bit = (sprite_slice & (128 >> col)) > 0;
-                        self.set_pixel(x + col as usize, y + row as usize, bit);        
+                        if (sprite_slice & (128 >> col)) != 0 {
+                            if self.set_pixel(x + col as usize, y + row as usize) {
+                                self.regs[0xF] = 1;
+                            }
+                        }
                     }
                 }
             },
@@ -289,7 +275,7 @@ impl Chip8 {
             },
 
             WaitForKeyInReg(reg) => {
-
+                // TODO
             },
             SkipIfKeyInRegPressed { not_pressed, reg } => {
                 let mut should_jump = keys[self.regs[reg as usize] as usize];     

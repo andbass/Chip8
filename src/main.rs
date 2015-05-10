@@ -31,6 +31,13 @@ fn main() {
 
         0xD0, 0x15,
 
+        // set vF to 10'
+        0x6F, 0x10,
+
+        // skip if vF is 10
+        0x3F, 0x10, 
+        0x19, 0x99,
+
         // loop
         0x12, 0x00
     ];
