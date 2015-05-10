@@ -6,5 +6,5 @@ authors = ["Andrew Bass <andybass009@gmail.com>"]
 [dependencies]
 rand = "*"
 
-[dependencies.ncurses]
-git = "https://github.com/jeaye/ncurses-rs.git"
+[dependencies.sdl2]
+git = "https://github.com/AngryLawyer/rust-sdl2"

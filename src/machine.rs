@@ -5,7 +5,6 @@ use std::io;
 use std::fmt;
 
 use opcode::{Opcode, OpcodeError, SetRegMode};
-use frontend::Frontend;
 
 const PROGRAM_START: u16 = 0x200;
 const FONT_START: u16 = 0x50;
@@ -33,6 +32,7 @@ const FONTMAP: [u8; 80] = [
   0xF0, 0x80, 0xF0, 0x80, 0x80  // F
 ];
 
+#[derive(Debug)]
 pub enum RuntimeError {
     EmptyCallStack,
     InvalidRegister(u8),
@@ -91,7 +91,7 @@ impl Chip8 {
         Ok(())
     }
 
-    pub fn cycle(&mut self, frontend: &mut Frontend) -> Result<(), RuntimeError> {
+    pub fn cycle(&mut self, keys: [bool; 16]) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
 
         let pc_index = self.pc as usize;
@@ -102,12 +102,11 @@ impl Chip8 {
             Err(err) => return Err(OpcodeErr(err)),
         };
 
-        try!(self.execute_opcode(opcode, frontend.get_keys()));
+        self.pc += 2;
+        try!(self.execute_opcode(opcode, keys));
 
         Chip8::decrement_timer(&mut self.delay_timer);
         Chip8::decrement_timer(&mut self.sound_timer);
-
-        frontend.draw(self.screen);
 
         Ok(())
     }
@@ -123,8 +122,8 @@ impl Chip8 {
     // Wrapping is performed in this function, no need to perform it outside
     pub fn set_pixel(&mut self, x: usize, y: usize, state: bool) {
         // Equivalent to using the mod operator, but faster
-        let x = x & 64;
-        let y = y & 32;
+        let x = x & 63;
+        let y = y & 31;
     
         let previous_state = self.screen[y][x];
         self.screen[y][x] ^= state;
@@ -142,6 +141,8 @@ impl Chip8 {
         use self::RuntimeError::*;
         use opcode::Opcode::*;
 
+        println!("{:?}", opcode);
+
         match opcode { 
             ClearScreen => self.clear_screen(),
             Return => {
@@ -157,10 +158,14 @@ impl Chip8 {
                 if plus_v0 { 
                     self.pc += self.regs[0] as u16; 
                 }
+
+                return Ok(());
             },
             Call(addr) => {
                 self.stack.push(self.pc);
                 self.pc = addr;
+
+                return Ok(());
             },
 
             SkipIfRegEqualConst { not_equal, reg, value } => {
@@ -171,8 +176,7 @@ impl Chip8 {
                 }
 
                 if should_jump {
-                    self.pc += 4;
-                    return Ok(());
+                    self.pc += 2;
                 }
             },
             SkipIfRegsEqual { not_equal, regs: (v_x, v_y) } => {
@@ -183,14 +187,19 @@ impl Chip8 {
                 }
 
                 if should_jump {
-                    self.pc += 4;
+                    self.pc += 2;
                     return Ok(());
                 }
             },
 
             SetRegToConst { add, reg, value } => {
                 if add {
-                    self.regs[reg as usize] += value;
+                    let mut value = self.regs[reg as usize] as u32 + value as u32;
+                    if value > 255 {
+                        value -= 255;
+                    }
+
+                    self.regs[reg as usize] = value as u8;
                 } else {
                     self.regs[reg as usize] = value;
                 }
@@ -232,11 +241,17 @@ impl Chip8 {
                         
                     // v_y is ignored for the shift opcodes, not sure why
                     SetRegMode::ShiftLeft => {
-                        self.regs[0xF] = self.regs[v_x] & 0xF0 >> 4;
-                        self.regs[v_x] <<= 1; 
+                        self.regs[0xF] = self.regs[v_x] & 0x1000000;
+
+                        let mut value = (self.regs[v_x] as usize) << 1;
+                        if value > 255 {
+                            value -= 255;
+                        }
+
+                        self.regs[v_x] = value as u8;
                     },
                     SetRegMode::ShiftRight => {
-                        self.regs[0xF] = self.regs[v_x] & 0x0F;
+                        self.regs[0xF] = self.regs[v_x] & 0x1;
                         self.regs[v_x] >>= 1;
                     }
                 }
@@ -256,7 +271,7 @@ impl Chip8 {
                     let sprite_slice = self.memory[(self.addressReg + row as u16) as usize];
                     
                     for col in 0..8 {
-                        let bit = (sprite_slice & (1 << col)) > 0;
+                        let bit = (sprite_slice & (128 >> col)) > 0;
                         self.set_pixel(x + col as usize, y + row as usize, bit);        
                     }
                 }
@@ -274,18 +289,17 @@ impl Chip8 {
             },
 
             WaitForKeyInReg(reg) => {
-                // TODO
+
             },
             SkipIfKeyInRegPressed { not_pressed, reg } => {
-                let should_jump = keys[self.regs[reg as usize] as usize];     
+                let mut should_jump = keys[self.regs[reg as usize] as usize];     
 
                 if not_pressed {
                     should_jump = !should_jump;
                 }
 
                 if should_jump {
-                    self.pc += 4;
-                    return Ok(());
+                    self.pc += 2;
                 }
             },
 
@@ -315,7 +329,6 @@ impl Chip8 {
             }
         }
 
-        self.pc += 2;
         Ok(())
     }
 
