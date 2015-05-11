@@ -46,12 +46,30 @@ fn main() {
 
     let file = Cursor::new(&program[..]);
 
-    let file = fs::File::open(path).unwrap();
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(err) => { 
+            println!("Could not open {}: {:?}", path, err);
+            return;
+        }
+    };
     
     let mut chip8 = Chip8::new();
-    let mut sdl = SdlFrontend::new(sdl2::init(sdl2::INIT_EVERYTHING).unwrap()).unwrap();
+    let mut sdl = match SdlFrontend::new(sdl2::init(sdl2::INIT_EVERYTHING).unwrap()) {
+        Ok(frontend) => frontend,
+        Err(err) => {
+            println!("Could not create SdlFrontend: {:?}", err); 
+            return;
+        }
+    };
 
-    chip8.load_program(file);
+    match chip8.load_program(file) {
+        Ok(_) => (),
+        Err(err) => {
+            println!("Could not load program: {:?}", err);
+            return;
+        }
+    }
     
     sdl.emulate_loop(chip8);
 }

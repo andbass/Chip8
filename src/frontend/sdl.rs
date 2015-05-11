@@ -89,7 +89,6 @@ impl<'a> Frontend for SdlFrontend<'a> {
         let mut start_time = timer::get_ticks();
         let mut paused = true;
         let mut step = false;
-        let mut speed = 6;
 
         let mut saved_state: Chip8 = chip8.clone();
         
@@ -100,7 +99,10 @@ impl<'a> Frontend for SdlFrontend<'a> {
                 match event {
                     Event::Quit { .. } => break 'main,
 
-                    Event::KeyDown { keycode: KeyCode::Escape, .. } => paused = !paused,
+                    Event::KeyDown { keycode: KeyCode::Escape, .. } => {
+                        paused = !paused;
+                        println!("{}", if paused { "Now paused" } else { "Resumed" });
+                    },
                     Event::KeyDown { keycode: KeyCode::Space, .. } => step = true,
 
                     Event::KeyDown { keycode: KeyCode::I, .. } => println!("\n{:?}\n", chip8),
@@ -114,23 +116,23 @@ impl<'a> Frontend for SdlFrontend<'a> {
                         println!("State restored!\n");
                     },
 
-                    Event::KeyDown { keycode: KeyCode::Right, .. } => {
-                        if speed as isize - 1 >= 0 {
-                            speed -= 1;
-                            println!("Speed up: {}", speed);
+                    Event::KeyDown { keycode: KeyCode::Left, .. } => {
+                        if chip8.speed - 1 >= 0 {
+                            chip8.speed -= 1;
+                            println!("Speed: {}", chip8.speed);
                         }
                     },
 
-                    Event::KeyDown { keycode: KeyCode::Left, .. } => {
-                        speed += 1;
-                        println!("Slow down: {}", speed);
+                    Event::KeyDown { keycode: KeyCode::Right, .. } => {
+                        chip8.speed += 1;
+                        println!("Speed: {}", chip8.speed);
                     },
                     
                     _ => (),
                 }
             }
             
-            if (!paused && timer::get_ticks() - start_time > speed) || step {
+            if (!paused && timer::get_ticks() - start_time > 17) || step {
                 match chip8.cycle(self.get_keys()) {
                     Ok(_) => (),
                     Err(err) => panic!("{:?}", err),

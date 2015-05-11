@@ -52,6 +52,10 @@ pub struct Chip8 {
     pub sound_timer: u16,
 
     pub screen: [[bool; 64]; 32],
+
+    // If Some(usize), then put the next key press into the regs[usize]
+    pub awaiting_key: Option<usize>, 
+    pub speed: isize,
 }
 
 impl Clone for Chip8 {
@@ -84,7 +88,10 @@ impl Clone for Chip8 {
             delay_timer: self.delay_timer,
             sound_timer: self.sound_timer,
 
-            screen: screen, 
+            screen: screen,
+
+            awaiting_key: self.awaiting_key.clone(),
+            speed: self.speed,
         }
     }
 }
@@ -103,6 +110,9 @@ impl Chip8 {
             sound_timer: 0,
 
             screen: [[false; 64]; 32],
+
+            awaiting_key: None,
+            speed: 17,
         };
 
         chip8.inject_fontmap();
@@ -129,20 +139,30 @@ impl Chip8 {
     pub fn cycle(&mut self, keys: [bool; 16]) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
 
-        Chip8::decrement_timer(&mut self.delay_timer);
-        Chip8::decrement_timer(&mut self.sound_timer);
+        if let Some(reg) = self.awaiting_key {
+            for (offset, key) in keys.iter().enumerate() {
+                if *key {
+                    self.regs[reg] = offset as u8;
+                    self.awaiting_key = None;
+                }
+            }
+        }
 
-        let pc_index = self.pc as usize;
-        let opcode_bytes = (self.memory[pc_index] as u16) << 8 | (self.memory[pc_index + 1] as u16);
+        for _ in 0..self.speed + 1 {
+            let pc_index = self.pc as usize;
+            let opcode_bytes = (self.memory[pc_index] as u16) << 8 | (self.memory[pc_index + 1] as u16);
 
-        let opcode = match Opcode::from_u16(opcode_bytes) {
-            Ok(opcode) => opcode,
-            Err(err) => return Err(OpcodeErr(err)),
-        };
-        //println!("{:X}: {:?}", opcode_bytes, opcode);
+            let opcode = match Opcode::from_u16(opcode_bytes) {
+                Ok(opcode) => opcode,
+                Err(err) => return Err(OpcodeErr(err)),
+            };
 
-        self.pc += 2;
-        try!(self.execute_opcode(opcode, keys));
+            self.pc += 2;
+            try!(self.execute_opcode(opcode, keys));
+            //println!("{:X}: {:?}", opcode_bytes, opcode);
+        }
+
+        self.update_timers();
 
         Ok(())
     }
@@ -240,7 +260,7 @@ impl Chip8 {
                         self.regs[0xF] = 0;
 
                         let mut reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
-                        if reg_value > 256 {
+                        if reg_value > 255 {
                             reg_value -= 256;
                             self.regs[0xF] = 1;
                         }
@@ -314,7 +334,8 @@ impl Chip8 {
             },
 
             WaitForKeyInReg(reg) => {
-                // TODO
+                println!("Waiting for any key in {}", reg);
+                self.awaiting_key = Some(reg as usize);
             },
             SkipIfKeyInRegPressed { not_pressed, reg } => {
                 let mut should_jump = keys[self.regs[reg as usize] as usize];     
@@ -357,10 +378,9 @@ impl Chip8 {
         Ok(())
     }
 
-    fn decrement_timer(timer: &mut u16) {
-        if *timer != 0 {
-            *timer -= 1;
-        }
+    fn update_timers(&mut self) {
+        if self.delay_timer > 0 { self.delay_timer -= 1; }
+        if self.sound_timer > 0 { self.sound_timer -= 1; }
     }
 }
 
