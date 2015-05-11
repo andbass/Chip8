@@ -7,9 +7,11 @@ use std::fs;
 use std::thread;
 use std::io::Cursor;
 
-mod machine;
-mod opcode;
-mod frontend;
+pub mod machine;
+pub mod opcode;
+pub mod frontend;
+
+mod tests;
 
 use machine::Chip8;
 use frontend::{SdlFrontend, Frontend};

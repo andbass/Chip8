@@ -35,9 +35,9 @@ impl SetRegMode {
             0x3 => Some(Xor),
             0x4 => Some(Add),
             0x5 => Some(Subtract),
+            0x6 => Some(ShiftRight),
             0x7 => Some(InverseSubtract),
             0xE => Some(ShiftLeft),
-            0x6 => Some(ShiftRight),
             _ => None,
         }
     }

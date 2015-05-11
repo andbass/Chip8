@@ -54,6 +54,41 @@ pub struct Chip8 {
     pub screen: [[bool; 64]; 32],
 }
 
+impl Clone for Chip8 {
+    fn clone(&self) -> Chip8 {
+        let mut memory = [0; 4096];
+        for (offset, byte) in self.memory.iter().enumerate() {
+            memory[offset] = *byte;
+        }
+
+        let mut regs = [0; 16];
+        for (offset, reg) in self.regs.iter().enumerate() {
+            regs[offset] = *reg;
+        }
+
+        let mut screen = [[false; 64]; 32];
+        for (y, row) in self.screen.iter().enumerate() {
+            for (x, elem) in row.iter().enumerate() {
+                screen[y][x] = *elem; 
+            }
+        }
+
+        Chip8 {
+            memory: memory,
+            regs: regs,
+            addressReg: self.addressReg,
+
+            pc: self.pc,
+            stack: self.stack.clone(),
+
+            delay_timer: self.delay_timer,
+            sound_timer: self.sound_timer,
+
+            screen: screen, 
+        }
+    }
+}
+
 impl Chip8 {
     pub fn new() -> Chip8 {
         let mut chip8 = Chip8 {
@@ -94,6 +129,9 @@ impl Chip8 {
     pub fn cycle(&mut self, keys: [bool; 16]) -> Result<(), RuntimeError> {
         use self::RuntimeError::*;
 
+        Chip8::decrement_timer(&mut self.delay_timer);
+        Chip8::decrement_timer(&mut self.sound_timer);
+
         let pc_index = self.pc as usize;
         let opcode_bytes = (self.memory[pc_index] as u16) << 8 | (self.memory[pc_index + 1] as u16);
 
@@ -105,9 +143,6 @@ impl Chip8 {
 
         self.pc += 2;
         try!(self.execute_opcode(opcode, keys));
-
-        Chip8::decrement_timer(&mut self.delay_timer);
-        Chip8::decrement_timer(&mut self.sound_timer);
 
         Ok(())
     }
@@ -202,6 +237,8 @@ impl Chip8 {
                     SetRegMode::Xor => self.regs[v_x] ^= self.regs[v_y],
 
                     SetRegMode::Add => {
+                        self.regs[0xF] = 0;
+
                         let mut reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
                         if reg_value > 255 {
                             reg_value -= 255;
@@ -211,6 +248,8 @@ impl Chip8 {
                         self.regs[v_x] = reg_value as u8;
                     },
                     SetRegMode::Subtract | SetRegMode::InverseSubtract => {
+                        self.regs[0xF] = 1;
+
                         let mut reg_value = if mode == SetRegMode::Subtract {
                             self.regs[v_x] as isize - self.regs[v_y] as isize
                         } else { // Must be InverseSubtract
@@ -219,7 +258,7 @@ impl Chip8 {
 
                         if reg_value < 0 {
                             reg_value += 255;
-                            self.regs[0xF] = 1;
+                            self.regs[0xF] = 0;
                         }
 
                         self.regs[v_x] = reg_value as u8;
@@ -230,6 +269,7 @@ impl Chip8 {
                         self.regs[0xF] = self.regs[v_x] & 128;
 
                         self.regs[v_x] <<= 1;
+                        println!("{}", self.regs[v_x]);
                     },
                     SetRegMode::ShiftRight => {
                         self.regs[0xF] = self.regs[v_x] & 0x1;
@@ -327,8 +367,8 @@ impl Chip8 {
 
 impl fmt::Debug for Chip8 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(fmt, "Program Counter: 0x{:X}", self.pc));
-        try!(writeln!(fmt, "Address Register: 0x{:X}", self.addressReg));
+        try!(writeln!(fmt, "Program Counter: 0x{:X} ({})", self.pc, self.pc));
+        try!(writeln!(fmt, "Address Register: 0x{:X} ({})", self.addressReg, self.addressReg));
         try!(writeln!(fmt, "Stack: {:?}", self.stack));
         try!(writeln!(fmt, "Delay Timer: {}", self.delay_timer));
         try!(writeln!(fmt, "Sound Timer: {}", self.sound_timer));

@@ -89,6 +89,9 @@ impl<'a> Frontend for SdlFrontend<'a> {
         let mut start_time = timer::get_ticks();
         let mut paused = true;
         let mut step = false;
+        let mut speed = 6;
+
+        let mut saved_state: Chip8 = chip8.clone();
         
         'main: loop {
             for event in self.ctx.event_pump().poll_iter() {
@@ -99,22 +102,46 @@ impl<'a> Frontend for SdlFrontend<'a> {
 
                     Event::KeyDown { keycode: KeyCode::Escape, .. } => paused = !paused,
                     Event::KeyDown { keycode: KeyCode::Space, .. } => step = true,
+
+                    Event::KeyDown { keycode: KeyCode::I, .. } => println!("\n{:?}\n", chip8),
+
+                    Event::KeyDown { keycode: KeyCode::F5, .. } => {
+                        saved_state = chip8.clone();
+                        println!("State saved!\n")
+                    },
+                    Event::KeyDown { keycode: KeyCode::F6, .. } => {
+                        chip8 = saved_state.clone();
+                        println!("State restored!\n");
+                    },
+
+                    Event::KeyDown { keycode: KeyCode::Right, .. } => {
+                        if speed as isize - 2 > 0 {
+                            speed -= 2;
+                            println!("Speed up: {}", speed);
+                        }
+                    },
+
+                    Event::KeyDown { keycode: KeyCode::Left, .. } => {
+                        speed += 2;
+                        println!("Slow down: {}", speed);
+                    },
                     
                     _ => (),
                 }
             }
             
-            if step || (!paused && timer::get_ticks() - start_time > 17) {
+            if (!paused && timer::get_ticks() - start_time > speed) || step {
                 match chip8.cycle(self.get_keys()) {
                     Ok(_) => (),
                     Err(err) => panic!("{:?}", err),
                 }
 
                 start_time = timer::get_ticks();
-                self.draw(&chip8.screen);
 
                 step = false;
             }
+
+            self.draw(&chip8.screen);
         }
     }
 }
