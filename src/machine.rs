@@ -240,8 +240,8 @@ impl Chip8 {
                         self.regs[0xF] = 0;
 
                         let mut reg_value = self.regs[v_x] as usize + self.regs[v_y] as usize;
-                        if reg_value > 255 {
-                            reg_value -= 255;
+                        if reg_value > 256 {
+                            reg_value -= 256;
                             self.regs[0xF] = 1;
                         }
 
@@ -257,7 +257,7 @@ impl Chip8 {
                         };
 
                         if reg_value < 0 {
-                            reg_value += 255;
+                            reg_value += 256;
                             self.regs[0xF] = 0;
                         }
 
@@ -269,7 +269,6 @@ impl Chip8 {
                         self.regs[0xF] = self.regs[v_x] & 128;
 
                         self.regs[v_x] <<= 1;
-                        println!("{}", self.regs[v_x]);
                     },
                     SetRegMode::ShiftRight => {
                         self.regs[0xF] = self.regs[v_x] & 0x1;
