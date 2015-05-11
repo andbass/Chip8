@@ -101,6 +101,7 @@ impl Chip8 {
             Ok(opcode) => opcode,
             Err(err) => return Err(OpcodeErr(err)),
         };
+        println!("{:X}: {:?}", opcode_bytes, opcode);
 
         self.pc += 2;
         try!(self.execute_opcode(opcode, keys));
@@ -137,7 +138,6 @@ impl Chip8 {
         use self::RuntimeError::*;
         use opcode::Opcode::*;
 
-        println!("{:?}", opcode);
         match opcode { 
             ClearScreen => self.clear_screen(),
             Return => {

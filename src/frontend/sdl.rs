@@ -5,6 +5,7 @@ use sdl2::{Sdl, SdlResult};
 use sdl2::rect::Rect;
 use sdl2::timer;
 use sdl2::scancode::ScanCode;
+use sdl2::keycode::KeyCode;
 use sdl2::video::{Window, WindowPos, OPENGL};
 use sdl2::render::{RenderDriverIndex, ACCELERATED, Renderer};
 use sdl2::keyboard;
@@ -86,28 +87,34 @@ impl<'a> Frontend for SdlFrontend<'a> {
 
     fn emulate_loop(&mut self, mut chip8: Chip8) {
         let mut start_time = timer::get_ticks();
+        let mut paused = true;
+        let mut step = false;
         
         'main: loop {
             for event in self.ctx.event_pump().poll_iter() {
                 use sdl2::event::Event;
 
                 match event {
-                    Event::Quit { ..} => break 'main,
+                    Event::Quit { .. } => break 'main,
+
+                    Event::KeyDown { keycode: KeyCode::Escape, .. } => paused = !paused,
+                    Event::KeyDown { keycode: KeyCode::Space, .. } => step = true,
+                    
                     _ => (),
                 }
             }
             
-            if timer::get_ticks() - start_time > 5 {
+            if step || (!paused && timer::get_ticks() - start_time > 17) {
                 match chip8.cycle(self.get_keys()) {
                     Ok(_) => (),
                     Err(err) => panic!("{:?}", err),
                 }
 
-                println!("{:?}\n", chip8);
                 start_time = timer::get_ticks();
-            }
+                self.draw(&chip8.screen);
 
-            self.draw(&chip8.screen);
+                step = false;
+            }
         }
     }
 }
