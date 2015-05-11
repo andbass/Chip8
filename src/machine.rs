@@ -139,7 +139,7 @@ impl Chip8 {
             Ok(opcode) => opcode,
             Err(err) => return Err(OpcodeErr(err)),
         };
-        println!("{:X}: {:?}", opcode_bytes, opcode);
+        //println!("{:X}: {:?}", opcode_bytes, opcode);
 
         self.pc += 2;
         try!(self.execute_opcode(opcode, keys));

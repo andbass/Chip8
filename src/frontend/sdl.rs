@@ -115,14 +115,14 @@ impl<'a> Frontend for SdlFrontend<'a> {
                     },
 
                     Event::KeyDown { keycode: KeyCode::Right, .. } => {
-                        if speed as isize - 2 > 0 {
-                            speed -= 2;
+                        if speed as isize - 1 >= 0 {
+                            speed -= 1;
                             println!("Speed up: {}", speed);
                         }
                     },
 
                     Event::KeyDown { keycode: KeyCode::Left, .. } => {
-                        speed += 2;
+                        speed += 1;
                         println!("Slow down: {}", speed);
                     },
                     
