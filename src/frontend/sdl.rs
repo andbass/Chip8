@@ -87,7 +87,7 @@ impl<'a> Frontend for SdlFrontend<'a> {
 
     fn emulate_loop(&mut self, mut chip8: Chip8) {
         let mut start_time = timer::get_ticks();
-        let mut paused = true;
+        let mut paused = false;
         let mut step = false;
 
         let mut saved_state: Chip8 = chip8.clone();

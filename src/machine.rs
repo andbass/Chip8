@@ -112,7 +112,7 @@ impl Chip8 {
             screen: [[false; 64]; 32],
 
             awaiting_key: None,
-            speed: 17,
+            speed: 7,
         };
 
         chip8.inject_fontmap();
@@ -142,6 +142,7 @@ impl Chip8 {
         if let Some(reg) = self.awaiting_key {
             for (offset, key) in keys.iter().enumerate() {
                 if *key {
+                    println!("{}: {}", offset, *key);
                     self.regs[reg] = offset as u8;
                     self.awaiting_key = None;
                 }
@@ -333,10 +334,7 @@ impl Chip8 {
                 self.addressReg = FONT_START + ch as u16 * 5;
             },
 
-            WaitForKeyInReg(reg) => {
-                println!("Waiting for any key in {}", reg);
-                self.awaiting_key = Some(reg as usize);
-            },
+            WaitForKeyInReg(reg) => self.awaiting_key = Some(reg as usize),
             SkipIfKeyInRegPressed { not_pressed, reg } => {
                 let mut should_jump = keys[self.regs[reg as usize] as usize];     
 
