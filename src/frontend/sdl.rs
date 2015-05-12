@@ -1,6 +1,4 @@
 
-use std::thread;
-
 use sdl2::{Sdl, SdlResult};
 use sdl2::rect::Rect;
 use sdl2::timer;

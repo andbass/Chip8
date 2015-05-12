@@ -43,7 +43,7 @@ pub enum RuntimeError {
 pub struct Chip8 {
     pub memory: [u8; MEMORY_SIZE],
     pub regs: [u8; REGISTER_COUNT], // registers V0 - V15
-    pub addressReg: u16, // register I
+    pub address_reg: u16, // register I
 
     pub pc: u16,
     pub stack: Vec<u16>,
@@ -80,7 +80,7 @@ impl Clone for Chip8 {
         Chip8 {
             memory: memory,
             regs: regs,
-            addressReg: self.addressReg,
+            address_reg: self.address_reg,
 
             pc: self.pc,
             stack: self.stack.clone(),
@@ -101,7 +101,7 @@ impl Chip8 {
         let mut chip8 = Chip8 {
             memory: [0; 4096],
             regs: [0; 16],
-            addressReg: 0,
+            address_reg: 0,
             
             pc: PROGRAM_START,
             stack: Vec::new(),
@@ -240,7 +240,7 @@ impl Chip8 {
 
             SetRegToConst { add, reg, value } => {
                 if add {
-                    let mut value = (self.regs[reg as usize] as u32 + value as u32) & 255;
+                    let value = (self.regs[reg as usize] as u32 + value as u32) & 255;
                     self.regs[reg as usize] = value as u8;
                 } else {
                     self.regs[reg as usize] = value;
@@ -298,7 +298,7 @@ impl Chip8 {
                 }
             },
 
-            SetAddressReg(addr) => self.addressReg = addr,
+            SetAddressReg(addr) => self.address_reg = addr,
             SetRegToRandom { reg, mask } => {
                 let rand: u8 = thread_rng().gen();
                 self.regs[reg as usize] = rand & mask;
@@ -311,7 +311,7 @@ impl Chip8 {
                 self.regs[0xF] = 0;
 
                 for row in 0..rows {
-                    let sprite_slice = self.memory[(self.addressReg + row as u16) as usize];
+                    let sprite_slice = self.memory[(self.address_reg + row as u16) as usize];
                     
                     for col in 0..8 {
                         if (sprite_slice & (128 >> col)) != 0 {
@@ -328,10 +328,10 @@ impl Chip8 {
             SetDelayTimerToReg(reg) => self.delay_timer = self.regs[reg as usize] as u16,
             SetSoundTimerToReg(reg) => self.sound_timer = self.regs[reg as usize] as u16,
 
-            AddRegToAddressReg(reg) => self.addressReg += self.regs[reg as usize] as u16,
+            AddRegToAddressReg(reg) => self.address_reg += self.regs[reg as usize] as u16,
             SetAddressRegToCharInReg(reg) => {
                 let ch = self.regs[reg as usize];
-                self.addressReg = FONT_START + ch as u16 * 5;
+                self.address_reg = FONT_START + ch as u16 * 5;
             },
 
             WaitForKeyInReg(reg) => self.awaiting_key = Some(reg as usize),
@@ -356,19 +356,19 @@ impl Chip8 {
                 let tens_digit = (number / 10) % 10; // Dividing by ten slides the tens digit into the ones digit
                 let ones_digit = number % 10;
 
-                self.memory[(self.addressReg) as usize] = hundreds_digit;
-                self.memory[(self.addressReg + 1) as usize] = tens_digit;
-                self.memory[(self.addressReg + 2) as usize] = ones_digit;
+                self.memory[(self.address_reg) as usize] = hundreds_digit;
+                self.memory[(self.address_reg + 1) as usize] = tens_digit;
+                self.memory[(self.address_reg + 2) as usize] = ones_digit;
             },
 
             DumpRegsToAddr(reg) => {
                 for cur_reg in 0..(reg + 1) {
-                    self.memory[(self.addressReg + cur_reg as u16)  as usize] = self.regs[cur_reg as usize];  
+                    self.memory[(self.address_reg + cur_reg as u16)  as usize] = self.regs[cur_reg as usize];  
                 }
             },
             LoadRegsFromAddr(reg) => {
                 for cur_reg in 0..(reg + 1) {
-                    self.regs[cur_reg as usize] = self.memory[(self.addressReg + cur_reg as u16) as usize];
+                    self.regs[cur_reg as usize] = self.memory[(self.address_reg + cur_reg as u16) as usize];
                 }
             }
         }
@@ -385,7 +385,7 @@ impl Chip8 {
 impl fmt::Debug for Chip8 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         try!(writeln!(fmt, "Program Counter: 0x{:X} ({})", self.pc, self.pc));
-        try!(writeln!(fmt, "Address Register: 0x{:X} ({})", self.addressReg, self.addressReg));
+        try!(writeln!(fmt, "Address Register: 0x{:X} ({})", self.address_reg, self.address_reg));
         try!(writeln!(fmt, "Stack: {:?}", self.stack));
         try!(writeln!(fmt, "Delay Timer: {}", self.delay_timer));
         try!(writeln!(fmt, "Sound Timer: {}", self.sound_timer));
