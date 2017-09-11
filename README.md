@@ -1,4 +1,4 @@
 # Chip8
-Chip8 emulator in Rust
+Chip8 emulator in Rust.
 
-This is being coded for a final project in school that is due very soon, as a result the code is somewhat rushed.
+Games seem to be fully playable, albeit without audio support.
