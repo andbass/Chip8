@@ -15,24 +15,16 @@ use frontend::{SdlFrontend, Frontend};
 fn main() {
     let path = env::args().nth(1).unwrap();
     
-    let file = match fs::File::open(&path) {
-        Ok(file) => file,
-        Err(err) => { 
-            println!("Could not open {}: {:?}", path, err);
-            return;
-        }
-    };
+    let file = fs::File::open(&path).unwrap_or_else(|err| {
+        panic!("Could not open program '{}': {}", path, err);
+    });
     
     let mut chip8 = Chip8::new();
     let mut sdl = SdlFrontend::new(sdl2::init().unwrap());
 
-    match chip8.load_program(file) {
-        Ok(_) => (),
-        Err(err) => {
-            println!("Could not load program: {:?}", err);
-            return;
-        }
-    }
+    chip8.load_program(file).unwrap_or_else(|err| {
+        panic!("Could not load program '{}': {}", path, err);
+    });
     
     sdl.emulate_loop(chip8);
 }
