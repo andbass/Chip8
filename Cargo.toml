@@ -7,4 +7,4 @@ authors = ["Andrew Bass <andybass009@gmail.com>"]
 rand = "*"
 
 [dependencies.sdl2]
-git = "https://github.com/AngryLawyer/rust-sdl2"
+git = "https://github.com/Rust-SDL2/rust-sdl2"

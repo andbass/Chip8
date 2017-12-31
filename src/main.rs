@@ -24,13 +24,7 @@ fn main() {
     };
     
     let mut chip8 = Chip8::new();
-    let mut sdl = match SdlFrontend::new(sdl2::init().unwrap()) {
-        Ok(frontend) => frontend,
-        Err(err) => {
-            println!("Could not create SdlFrontend: {:?}", err); 
-            return;
-        }
-    };
+    let mut sdl = SdlFrontend::new(sdl2::init().unwrap());
 
     match chip8.load_program(file) {
         Ok(_) => (),
