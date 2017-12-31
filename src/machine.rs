@@ -142,7 +142,6 @@ impl Chip8 {
         if let Some(reg) = self.awaiting_key {
             for (offset, key) in keys.iter().enumerate() {
                 if *key {
-                    println!("{}: {}", offset, *key);
                     self.regs[reg] = offset as u8;
                     self.awaiting_key = None;
                 }
