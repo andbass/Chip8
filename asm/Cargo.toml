@@ -1,0 +1,12 @@
+[package]
+name = "asm"
+version = "0.1.0"
+authors = ["Andrew <andybass009@gmail.com>"]
+
+[dependencies]
+
+[dependencies.chip8]
+path = ".."
+
+[dependencies.rlisp]
+git = "https://github.com/andbass/rlisp"
